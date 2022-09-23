@@ -1,0 +1,51 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "pymc-util",
+    "section": "",
+    "text": "This file will become your README and also the index of your documentation."
+  },
+  {
+    "objectID": "index.html#install",
+    "href": "index.html#install",
+    "title": "pymc-util",
+    "section": "Install",
+    "text": "Install\npip install pymc_util"
+  },
+  {
+    "objectID": "index.html#how-to-use",
+    "href": "index.html#how-to-use",
+    "title": "pymc-util",
+    "section": "How to use",
+    "text": "How to use\nFill me in please! Don’t forget code examples:\n\n1+1\n\n2"
+  },
+  {
+    "objectID": "basic_bayesian_workflow.html",
+    "href": "basic_bayesian_workflow.html",
+    "title": "Basic Bayesian Workflow",
+    "section": "",
+    "text": "from aesara import pprint\nfrom matplotlib import pyplot as plt, ticker\nimport numpy as np\nimport pandas as pd\nimport scipy as sp\nimport seaborn as sns\nfrom sklearn.preprocessing import StandardScaler\nimport pymc as pm\nfrom aesara import tensor as at\nimport arviz as az\nimport xarray as xr"
+  },
+  {
+    "objectID": "basic_bayesian_workflow.html#create-model",
+    "href": "basic_bayesian_workflow.html#create-model",
+    "title": "Basic Bayesian Workflow",
+    "section": "Create model",
+    "text": "Create model\n\nSimulate some data\n\nwith pm.Model() as sim:\n    x_dist = pm.Normal(\"x\", 10, 1)\n    ϵ_dist = pm.Normal(\"ϵ\", 0, 1.5)\n\nx_raw, ϵ = pm.draw([x_dist, ϵ_dist], 250)\ny_raw = 5 + 3 * x_raw + ϵ\n\n\nplt.scatter(x_raw, y_raw)\nplt.title(\"Simulated data\")\nplt.xlabel('x')\nplt.ylabel('y')\nplt.show();\n\n\n\n\n\n\nScale data\nNote that standardized data:\n\nDoes not require an intercept\nHas a natural range for the regression slope\n\n\nfrom sklearn.preprocessing import StandardScaler\n\n\nx_scaler, y_scaler = StandardScaler(), StandardScaler()\n\nx = x_scaler.fit_transform(x_raw.reshape([-1,1])).squeeze()\ny = y_scaler.fit_transform(y_raw.reshape([-1,1])).squeeze()\n\n\nplt.scatter(x, y)\nplt.title(\"Standardized simulated data\")\nplt.xlabel('x')\nplt.ylabel('y')\nplt.show();\n\n\n\n\n\n\nSetup model\nNote that due to the prior this a regularized model.\n\ndef setup_model(x, y, intercept=True):\n    model = pm.Model()\n\n    with model:        \n        if intercept: α = pm.Normal(\"α\", 0, 1)\n        else: α = 0\n        \n        β = pm.Normal(\"β\", 0, 1)\n        σ = pm.HalfNormal(\"σ\", 1)\n        \n        μ = α + β * x\n            \n        obs = pm.Normal(\"obs\", μ, σ, observed=y)\n        \n    return model\n\nmodel = setup_model(x, y, True)\n\n\n\nVisualise model\n\npm.model_to_graphviz(model)\n\n\n\n\n\n\nCheck priors parameters\n\nprior_samples = pm.sample_prior_predictive(samples=100, var_names=['α', 'β', 'σ', 'obs'], model=model)\n\n\nfor idx, row in prior_samples.prior.to_dataframe().iterrows():\n    α = row['α']\n    β = row['β']\n    plt.plot(x, α + β * x, c='lightgrey')\n\n\n\n\n\n\nCheck prior predictive\n\naz.plot_dist(\n    y,\n    kind=\"hist\",\n    color=\"C1\",\n    hist_kwargs=dict(alpha=0.6),\n    label=\"observed\",\n)\n\naz.plot_dist(\n    prior_samples.prior_predictive[\"obs\"],\n    kind=\"hist\",\n    hist_kwargs=dict(alpha=0.6),\n    label=\"simulated\",\n)\nplt.xticks(rotation=45);\n\nplt.title('Historgram of observed and simulated target')\n\nText(0.5, 1.0, 'Historgram of observed and simulated target')"
+  },
+  {
+    "objectID": "basic_bayesian_workflow.html#fit-model",
+    "href": "basic_bayesian_workflow.html#fit-model",
+    "title": "Basic Bayesian Workflow",
+    "section": "Fit model",
+    "text": "Fit model\n\nSample using NUTS\n\nwith model:\n    #model_idata = pm.sample()\n    model_trace = pm.sample(return_inferencedata=False)\n    model_idata = pm.to_inference_data(trace=model_trace, model=model, log_likelihood=True)\n\nAuto-assigning NUTS sampler...\nInitializing NUTS using jitter+adapt_diag...\nMultiprocess sampling (4 chains in 4 jobs)\nNUTS: [α, β, σ]\n\n\n\n\n\n\n\n    \n      \n      100.00% [8000/8000 00:01<00:00 Sampling 4 chains, 0 divergences]\n    \n    \n\n\nSampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 2 seconds.\n\n\n\n\nVerify model\n\nSummary\n\naz.summary(model_idata, round_to=2)\n\n\n\n\n\n  \n    \n      \n      mean\n      sd\n      hdi_3%\n      hdi_97%\n      mcse_mean\n      mcse_sd\n      ess_bulk\n      ess_tail\n      r_hat\n    \n  \n  \n    \n      α\n      -0.00\n      0.03\n      -0.06\n      0.05\n      0.0\n      0.0\n      5933.97\n      3118.52\n      1.0\n    \n    \n      β\n      0.90\n      0.03\n      0.85\n      0.95\n      0.0\n      0.0\n      5774.87\n      3143.23\n      1.0\n    \n    \n      σ\n      0.43\n      0.02\n      0.40\n      0.47\n      0.0\n      0.0\n      5548.62\n      2994.59\n      1.0\n    \n  \n\n\n\n\n\n\nVerify parameter sampling\n\naz.plot_trace(model_idata);\n\n\n\n\n\n\nVerify posterior label sampling\n\n# Note works if only posterior predictive y_hat is in sample\nmodel_posterior_sample = pm.sample_posterior_predictive(model_idata, model=model)\naz.plot_ppc(model_posterior_sample);\n\n\n\n\n\n\n    \n      \n      100.00% [4000/4000 00:00<00:00]\n    \n    \n\n\n/home/sanne/.virtualenvs/pymc/lib/python3.10/site-packages/IPython/core/events.py:89: UserWarning: Creating legend with loc=\"best\" can be slow with large amounts of data.\n  func(*args, **kwargs)\n/home/sanne/.virtualenvs/pymc/lib/python3.10/site-packages/IPython/core/pylabtools.py:151: UserWarning: Creating legend with loc=\"best\" can be slow with large amounts of data.\n  fig.canvas.print_figure(bytes_io, **kw)\n\n\n\n\n\n\n\nPlot HDI intervals\n\nposterior = model_idata.posterior\nmodel_obs = (posterior[\"α\"] + np.random.normal(0, posterior[\"σ\"]) + posterior[\"β\"] * xr.DataArray(x))\nmodel_mu = (posterior[\"α\"] + posterior[\"β\"] * xr.DataArray(x))\navg_model_mu = model_mu.mean(dim=['chain', 'draw'])\n\n\naz.plot_hdi(x, model_mu, hdi_prob=.96, color='r', fill_kwargs={\"alpha\": .2})\naz.plot_hdi(x, model_obs, hdi_prob=.96, color='black', fill_kwargs={\"alpha\": .2})\nplt.scatter(x, y, alpha=0.4)\nplt.plot(x, avg_model_mu, color='black')\nplt.xlabel('x')\nplt.ylabel('y_hat')\nplt.title('HDI intervals for α + β * x and α + β * x + ϵ');\n\n\n\n\n\n\nAssess model fit\n\naz.waic(model_idata)\n\nComputed from 4000 posterior samples and 250 observations log-likelihood matrix.\n\n          Estimate       SE\nelpd_waic  -146.70    10.87\np_waic        2.87        -\n\n\n\n\n\nInterpret results\n\nPlot forest\n\nfor var_name in ['α', 'β', 'σ']:\n    az.plot_forest(model_idata, var_names=var_name);\n\n\n\n\n\n\n\n\n\n\n\n\nPlot HDI for parameters\n\naz.plot_posterior(model_idata);"
+  },
+  {
+    "objectID": "basic_bayesian_workflow.html#compare-with-better-model",
+    "href": "basic_bayesian_workflow.html#compare-with-better-model",
+    "title": "Basic Bayesian Workflow",
+    "section": "Compare with better model",
+    "text": "Compare with better model\n\nCreate better model\n\nbetter_model = setup_model(x, y, False)\n\nwith better_model:\n    better_model_idata = pm.sample()    \n\naz.plot_trace(better_model_idata);\n\nAuto-assigning NUTS sampler...\nInitializing NUTS using jitter+adapt_diag...\nMultiprocess sampling (4 chains in 4 jobs)\nNUTS: [β, σ]\n\n\n\n\n\n\n\n    \n      \n      100.00% [8000/8000 00:01<00:00 Sampling 4 chains, 0 divergences]\n    \n    \n\n\nSampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 2 seconds.\n\n\n\n\n\n\naz.waic(better_model_idata)\n\nComputed from 4000 posterior samples and 250 observations log-likelihood matrix.\n\n          Estimate       SE\nelpd_waic  -145.66    10.89\np_waic        1.85        -\n\n\n\n\nCompare the fit\n\n# df_comp_loo = az.compare({\n#     \"model\": model_idata,\n#     \"better_model\": better_model_idata\n# })\n\n# df_comp_loo\n\n\n# Plot loo or WAICC with dloo or dWAIC\n#az.plot_compare(df_comp_loo, insample_dev=False);"
+  }
+]
