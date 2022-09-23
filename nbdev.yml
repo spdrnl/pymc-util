@@ -1,0 +1,9 @@
+project:
+  output-dir: _docs
+
+website:
+  title: "pymc-util"
+  site-url: "https://spdrnl.github.io/pymc-util"
+  description: "Utility functions for pymc"
+  repo-branch: main
+  repo-url: "https://github.com/spdrnl/pymc-util"
